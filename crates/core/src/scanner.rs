@@ -85,10 +85,35 @@ fn claude_roots() -> Result<Vec<PathBuf>> {
 fn codex_roots() -> Result<Vec<PathBuf>> {
     let home = dirs::home_dir()
         .ok_or_else(|| crate::error::AppError::PathResolution("no home dir".into()))?;
-    Ok(vec![
+    let cwd = std::env::current_dir()?;
+    Ok(codex_roots_for(&home, &cwd))
+}
+
+fn codex_roots_for(home: &Path, cwd: &Path) -> Vec<PathBuf> {
+    let mut roots = vec![
         home.join(".agents").join("skills"),
+        home.join(".codex").join("skills"),
         home.join(".codex").join("plugins").join("cache"),
-    ])
+        PathBuf::from("/etc/codex/skills"),
+    ];
+
+    for ancestor in cwd.ancestors() {
+        roots.push(ancestor.join(".agents").join("skills"));
+    }
+
+    dedupe_paths(roots)
+}
+
+fn dedupe_paths(paths: Vec<PathBuf>) -> Vec<PathBuf> {
+    let mut seen = std::collections::HashSet::new();
+    let mut out = Vec::new();
+    for path in paths {
+        let key = path.to_string_lossy().to_lowercase();
+        if seen.insert(key) {
+            out.push(path);
+        }
+    }
+    out
 }
 
 fn scan_dir(dir: &Path, platform: Platform, out: &mut Vec<RawSkill>) -> Result<()> {
@@ -177,4 +202,22 @@ fn parse_frontmatter(content: &str) -> HashMap<String, String> {
         }
     }
     map
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn codex_roots_include_local_codex_skills_and_project_agent_skills() {
+        let home = PathBuf::from("C:/Users/example");
+        let cwd = home.join("work").join("project").join("nested");
+
+        let roots = codex_roots_for(&home, &cwd);
+
+        assert!(roots.contains(&home.join(".agents").join("skills")));
+        assert!(roots.contains(&home.join(".codex").join("skills")));
+        assert!(roots.contains(&home.join(".codex").join("plugins").join("cache")));
+        assert!(roots.contains(&home.join("work").join("project").join(".agents").join("skills")));
+    }
 }
