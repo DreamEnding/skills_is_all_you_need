@@ -1,18 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
 import "./App.css";
-
-interface SkillInfo {
-  canonical_name: string;
-  locations: { platform: string; skill_path: string }[];
-}
-
-interface UsageSummaryInfo {
-  canonical_name: string;
-  platform: string;
-  confidence: string;
-  count: number;
-}
+import {
+  getUsageSummary,
+  importUsageEvents,
+  scanSkills as scanSkillsCommand,
+  type SkillInfo,
+  type UsageSummaryInfo,
+} from "./tauriClient";
 
 type Action = "scan" | "import" | "summary" | null;
 type View = "overview" | "inventory";
@@ -108,16 +102,14 @@ function App() {
   }
 
   async function refreshSummary() {
-    const result = await runAction("summary", () =>
-      invoke<UsageSummaryInfo[]>("get_usage_summary"),
-    );
+    const result = await runAction("summary", getUsageSummary);
     if (result) {
       setSummary(result);
     }
   }
 
   async function importEvents() {
-    const imported = await runAction("import", () => invoke<number>("import_usage_events"));
+    const imported = await runAction("import", importUsageEvents);
     if (imported !== null) {
       setLastImportCount(imported);
       await refreshSummary();
@@ -125,7 +117,7 @@ function App() {
   }
 
   async function scanSkills() {
-    const result = await runAction("scan", () => invoke<SkillInfo[]>("scan_skills"));
+    const result = await runAction("scan", scanSkillsCommand);
     if (result) {
       setSkills(result);
     }
