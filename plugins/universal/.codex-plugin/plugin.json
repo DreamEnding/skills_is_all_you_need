@@ -1,0 +1,22 @@
+{
+  "name": "skill-usage-manager",
+  "version": "0.1.0",
+  "description": "Track and manage Claude Code and Codex skill usage locally.",
+  "author": {
+    "name": "Local"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Skill Usage Manager",
+    "shortDescription": "Track and manage skill usage",
+    "longDescription": "Local dashboard and hooks for Claude Code and Codex skill usage analytics.",
+    "developerName": "Local",
+    "category": "Productivity",
+    "capabilities": [
+      "Read",
+      "Write"
+    ],
+    "brandColor": "#2563EB"
+  }
+}
+

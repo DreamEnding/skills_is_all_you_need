@@ -1,0 +1,9 @@
+{
+  "name": "skill-usage-manager",
+  "version": "0.1.0",
+  "description": "Track and manage Claude Code and Codex skill usage locally.",
+  "author": {
+    "name": "Local"
+  }
+}
+
