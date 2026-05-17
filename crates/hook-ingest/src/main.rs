@@ -1,4 +1,5 @@
 use clap::{Parser, Subcommand, ValueEnum};
+use serde::Serialize;
 use skill_usage_core::models::{Platform, UsageEvent};
 use skill_usage_core::{events, paths};
 use std::io::{self, Read, Write};
@@ -48,7 +49,10 @@ enum Commands {
     /// Verify hook setup and health.
     Doctor,
     /// Scan skills and print inventory.
-    Scan,
+    Scan {
+        #[arg(long, value_enum, default_value_t = OutputFormat::Table)]
+        format: OutputFormat,
+    },
 }
 
 #[derive(Subcommand)]
@@ -99,7 +103,7 @@ fn main() {
             Ok(())
         }
         Commands::Doctor => doctor(),
-        Commands::Scan => scan(),
+        Commands::Scan { format } => scan(format),
     };
 
     if let Err(e) = result {
@@ -133,8 +137,39 @@ fn doctor() -> skill_usage_core::error::Result<()> {
     Ok(())
 }
 
-fn scan() -> skill_usage_core::error::Result<()> {
+#[derive(Serialize)]
+struct ScanInfo {
+    canonical_name: String,
+    locations: Vec<ScanLocationInfo>,
+}
+
+#[derive(Serialize)]
+struct ScanLocationInfo {
+    platform: String,
+    skill_path: String,
+}
+
+fn scan(format: OutputFormat) -> skill_usage_core::error::Result<()> {
     let results = skill_usage_core::scanner::scan_all()?;
+    if matches!(format, OutputFormat::Json) {
+        let rows = results
+            .into_iter()
+            .map(|r| ScanInfo {
+                canonical_name: r.skill.canonical_name,
+                locations: r
+                    .locations
+                    .into_iter()
+                    .map(|loc| ScanLocationInfo {
+                        platform: loc.platform.as_str().to_string(),
+                        skill_path: loc.skill_path,
+                    })
+                    .collect(),
+            })
+            .collect::<Vec<_>>();
+        println!("{}", serde_json::to_string_pretty(&rows)?);
+        return Ok(());
+    }
+
     if results.is_empty() {
         println!("No skills found.");
         return Ok(());

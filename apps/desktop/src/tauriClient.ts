@@ -77,7 +77,19 @@ export async function importUsageEvents(): Promise<number> {
 
 export async function scanSkills(): Promise<SkillInfo[]> {
   if (!isTauriRuntime()) {
-    return previewSkills;
+    return scanSkillsFromDevServer();
   }
   return invoke<SkillInfo[]>("scan_skills");
+}
+
+async function scanSkillsFromDevServer(): Promise<SkillInfo[]> {
+  try {
+    const response = await fetch("/api/scan-skills");
+    if (!response.ok) {
+      return previewSkills;
+    }
+    return (await response.json()) as SkillInfo[];
+  } catch {
+    return previewSkills;
+  }
 }

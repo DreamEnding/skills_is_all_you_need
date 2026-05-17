@@ -66,3 +66,22 @@ fn hook_import_and_summary_provide_cli_acceptance_path() {
     assert_eq!(rows[0]["confidence"], "confirmed");
     assert_eq!(rows[0]["count"], 1);
 }
+
+#[test]
+fn scan_supports_json_output_for_dev_preview() {
+    let mut scan = Command::cargo_bin("skill-meter").expect("binary");
+    let stdout = scan
+        .args(["scan", "--format", "json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let rows: serde_json::Value = serde_json::from_slice(&stdout).expect("json");
+
+    assert!(rows.is_array());
+    if let Some(first) = rows.as_array().and_then(|items| items.first()) {
+        assert!(first.get("canonical_name").is_some());
+        assert!(first.get("locations").is_some());
+    }
+}
