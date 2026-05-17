@@ -143,6 +143,31 @@ input:focus {
   color: #174bb3;
 }
 
+.language-switch {
+  display: inline-flex;
+  width: 100%;
+  margin-top: 16px;
+  border: 1px solid #d5dce6;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 3px;
+}
+
+.language-switch button {
+  flex: 1;
+  min-height: 30px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #475569;
+  padding: 0 10px;
+}
+
+.language-switch button.selected {
+  background: #172033;
+  color: #ffffff;
+}
+
 .sidebar-status {
   margin-top: auto;
   border: 1px solid #dde3ea;

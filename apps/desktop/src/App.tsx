@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import "./App.css";
+import { getInitialLanguage, translate, type Language } from "./i18n";
 import {
   getUsageSummary,
   importUsageEvents,
@@ -11,8 +12,15 @@ import {
 type Action = "scan" | "import" | "summary" | null;
 type View = "overview" | "inventory";
 type PlatformFilter = "all" | "claude" | "codex";
+const languageStorageKey = "skill-usage-manager-language";
 
 function App() {
+  const [language, setLanguage] = useState<Language>(() =>
+    getInitialLanguage(
+      localStorage.getItem(languageStorageKey),
+      navigator.language,
+    ),
+  );
   const [skills, setSkills] = useState<SkillInfo[]>([]);
   const [summary, setSummary] = useState<UsageSummaryInfo[]>([]);
   const [activeAction, setActiveAction] = useState<Action>(null);
@@ -82,11 +90,20 @@ function App() {
       .sort((a, b) => a.canonical_name.localeCompare(b.canonical_name));
   }, [inventoryQuery, platformFilter, skills]);
 
-  const activeLabel = activeAction ? actionLabel(activeAction) : "Ready";
+  const t = useMemo(() => {
+    return (key: Parameters<typeof translate>[1], params?: Parameters<typeof translate>[2]) =>
+      translate(language, key, params);
+  }, [language]);
+  const activeLabel = activeAction ? actionLabel(activeAction, t) : t("status.ready");
 
   useEffect(() => {
     void refreshSummary();
   }, []);
+
+  function selectLanguage(nextLanguage: Language) {
+    setLanguage(nextLanguage);
+    localStorage.setItem(languageStorageKey, nextLanguage);
+  }
 
   async function runAction<T>(action: Action, task: () => Promise<T>): Promise<T | null> {
     setActiveAction(action);
@@ -125,12 +142,12 @@ function App() {
 
   return (
     <main className="app-frame">
-      <aside className="sidebar" aria-label="Primary navigation">
+      <aside className="sidebar" aria-label={t("aria.primaryNavigation")}>
         <div className="brand">
           <div className="brand-mark">SUM</div>
           <div>
-            <h1>Skill Usage</h1>
-            <span>Local manager</span>
+            <h1>{t("app.brand")}</h1>
+            <span>{t("app.subtitle")}</span>
           </div>
         </div>
 
@@ -139,18 +156,30 @@ function App() {
             className={view === "overview" ? "active" : ""}
             onClick={() => setView("overview")}
           >
-            Overview
+            {t("nav.overview")}
           </button>
           <button
             className={view === "inventory" ? "active" : ""}
             onClick={() => setView("inventory")}
           >
-            Inventory
+            {t("nav.inventory")}
           </button>
         </nav>
 
+        <div className="language-switch" aria-label="Language">
+          {(["en", "zh"] as Language[]).map((item) => (
+            <button
+              key={item}
+              className={language === item ? "selected" : ""}
+              onClick={() => selectLanguage(item)}
+            >
+              {t(item === "en" ? "language.en" : "language.zh")}
+            </button>
+          ))}
+        </div>
+
         <div className="sidebar-status">
-          <span>Status</span>
+          <span>{t("status.status")}</span>
           <strong>{activeLabel}</strong>
         </div>
       </aside>
@@ -158,41 +187,43 @@ function App() {
       <section className="workspace">
         <header className="topbar">
           <div>
-            <p className="eyebrow">Skills analytics</p>
-            <h2>{view === "overview" ? "Usage overview" : "Skill inventory"}</h2>
+            <p className="eyebrow">{t("app.eyebrow")}</p>
+            <h2>{view === "overview" ? t("views.overview") : t("views.inventory")}</h2>
           </div>
-          <div className="toolbar" aria-label="Dashboard actions">
+          <div className="toolbar" aria-label={t("aria.dashboardActions")}>
             <button className="primary" onClick={importEvents} disabled={activeAction !== null}>
               {activeAction === "import" ? <span className="spinner" /> : null}
-              Import
+              {t("actions.import")}
             </button>
             <button onClick={refreshSummary} disabled={activeAction !== null}>
               {activeAction === "summary" ? <span className="spinner" /> : null}
-              Refresh
+              {t("actions.refresh")}
             </button>
             <button onClick={scanSkills} disabled={activeAction !== null}>
               {activeAction === "scan" ? <span className="spinner" /> : null}
-              Scan
+              {t("actions.scan")}
             </button>
           </div>
         </header>
 
         <div className="control-row">
-          <div className="segmented" aria-label="Platform filter">
+          <div className="segmented" aria-label={t("aria.platformFilter")}>
             {(["all", "claude", "codex"] as PlatformFilter[]).map((platform) => (
               <button
                 key={platform}
                 className={platformFilter === platform ? "selected" : ""}
                 onClick={() => setPlatformFilter(platform)}
               >
-                {platform}
+                {t(`filter.${platform}`)}
               </button>
             ))}
           </div>
           {lastImportCount !== null ? (
-            <div className="inline-status">Imported {lastImportCount} new event(s)</div>
+            <div className="inline-status">
+              {t("status.imported", { count: lastImportCount })}
+            </div>
           ) : (
-            <div className="inline-status muted">Waiting for import</div>
+            <div className="inline-status muted">{t("status.waitingImport")}</div>
           )}
         </div>
 
@@ -201,18 +232,18 @@ function App() {
         {view === "overview" ? (
           <>
             <section className="metric-grid" aria-label="Usage metrics">
-              <Metric label="Total calls" value={totalCalls.toLocaleString()} />
-              <Metric label="Confirmed" value={confirmedCalls.toLocaleString()} />
-              <Metric label="Confidence" value={`${confidenceShare}%`} />
-              <Metric label="Tracked skills" value={topSkills.length.toLocaleString()} />
+              <Metric label={t("metrics.totalCalls")} value={totalCalls.toLocaleString()} />
+              <Metric label={t("metrics.confirmed")} value={confirmedCalls.toLocaleString()} />
+              <Metric label={t("metrics.confidence")} value={`${confidenceShare}%`} />
+              <Metric label={t("metrics.trackedSkills")} value={topSkills.length.toLocaleString()} />
             </section>
 
             <section className="content-grid">
               <div className="panel span-2">
-                <PanelHeading title="Top skills" meta={`${topSkills.length} ranked`} />
+                <PanelHeading title={t("panels.topSkills")} meta={t("meta.ranked", { count: topSkills.length })} />
                 <div className="bar-list">
                   {topSkills.length === 0 ? (
-                    <EmptyState text="Import queued events to populate usage rankings." />
+                    <EmptyState text={t("empty.topSkills")} />
                   ) : (
                     topSkills.map((skill) => (
                       <BarRow
@@ -227,7 +258,7 @@ function App() {
               </div>
 
               <div className="panel">
-                <PanelHeading title="Platform share" meta="all usage" />
+                <PanelHeading title={t("panels.platformShare")} meta={t("meta.allUsage")} />
                 <div className="share-list">
                   <ShareRow label="Claude" value={platformCounts.claude} total={summaryTotal(summary)} />
                   <ShareRow label="Codex" value={platformCounts.codex} total={summaryTotal(summary)} />
@@ -235,20 +266,20 @@ function App() {
               </div>
             </section>
 
-            <UsageTable rows={filteredSummary} />
+            <UsageTable rows={filteredSummary} t={t} />
           </>
         ) : (
           <section className="panel inventory-panel">
             <div className="inventory-toolbar">
-              <PanelHeading title="Skill inventory" meta={`${filteredSkills.length} visible`} />
+              <PanelHeading title={t("views.inventory")} meta={t("meta.visible", { count: filteredSkills.length })} />
               <input
-                aria-label="Search inventory"
-                placeholder="Search skills or paths"
+                aria-label={t("aria.searchInventory")}
+                placeholder={t("search.placeholder")}
                 value={inventoryQuery}
                 onChange={(event) => setInventoryQuery(event.target.value)}
               />
             </div>
-            <InventoryTable skills={filteredSkills} />
+            <InventoryTable skills={filteredSkills} t={t} />
           </section>
         )}
       </section>
@@ -304,25 +335,27 @@ function ShareRow({ label, value, total }: { label: string; value: number; total
   );
 }
 
-function UsageTable({ rows }: { rows: UsageSummaryInfo[] }) {
+type Translate = (key: Parameters<typeof translate>[1], params?: Parameters<typeof translate>[2]) => string;
+
+function UsageTable({ rows, t }: { rows: UsageSummaryInfo[]; t: Translate }) {
   return (
     <section className="panel">
-      <PanelHeading title="Usage summary" meta={`${rows.length} row(s)`} />
+      <PanelHeading title={t("panels.usageSummary")} meta={t("meta.rows", { count: rows.length })} />
       <div className="table-wrap">
         <table>
           <thead>
             <tr>
-              <th>Skill</th>
-              <th>Platform</th>
-              <th>Confidence</th>
-              <th className="numeric">Calls</th>
+              <th>{t("tables.skill")}</th>
+              <th>{t("tables.platform")}</th>
+              <th>{t("tables.confidence")}</th>
+              <th className="numeric">{t("tables.calls")}</th>
             </tr>
           </thead>
           <tbody>
             {rows.length === 0 ? (
               <tr>
                 <td colSpan={4}>
-                  <EmptyState text="No usage events match the current filter." />
+                  <EmptyState text={t("empty.usage")} />
                 </td>
               </tr>
             ) : (
@@ -344,22 +377,22 @@ function UsageTable({ rows }: { rows: UsageSummaryInfo[] }) {
   );
 }
 
-function InventoryTable({ skills }: { skills: SkillInfo[] }) {
+function InventoryTable({ skills, t }: { skills: SkillInfo[]; t: Translate }) {
   return (
     <div className="table-wrap">
       <table>
         <thead>
           <tr>
-            <th>Skill</th>
-            <th>Platforms</th>
-            <th className="numeric">Locations</th>
+            <th>{t("tables.skill")}</th>
+            <th>{t("tables.platforms")}</th>
+            <th className="numeric">{t("tables.locations")}</th>
           </tr>
         </thead>
         <tbody>
           {skills.length === 0 ? (
             <tr>
               <td colSpan={3}>
-                <EmptyState text="Run a scan or adjust the filter to see local Skills." />
+                <EmptyState text={t("empty.inventory")} />
               </td>
             </tr>
           ) : (
@@ -389,14 +422,14 @@ function summaryTotal(rows: UsageSummaryInfo[]): number {
   return rows.reduce((total, row) => total + row.count, 0);
 }
 
-function actionLabel(action: Exclude<Action, null>) {
+function actionLabel(action: Exclude<Action, null>, t: Translate) {
   switch (action) {
     case "scan":
-      return "Scanning";
+      return t("status.scanning");
     case "import":
-      return "Importing";
+      return t("status.importing");
     case "summary":
-      return "Refreshing";
+      return t("status.refreshing");
   }
 }
 
