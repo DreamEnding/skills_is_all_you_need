@@ -5,6 +5,7 @@ dist/
 *.db-wal
 *.db-shm
 *.jsonl
+*.log
 .DS_Store
 *.swp
 *.swo
