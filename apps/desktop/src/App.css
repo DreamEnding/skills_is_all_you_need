@@ -187,7 +187,10 @@ input:focus {
 }
 
 .workspace {
+  display: flex;
+  min-height: 100vh;
   min-width: 0;
+  flex-direction: column;
   padding: 24px;
 }
 
@@ -430,7 +433,10 @@ input:focus {
 }
 
 .inventory-panel {
-  min-height: calc(100vh - 156px);
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
 }
 
 .inventory-toolbar {
@@ -450,6 +456,12 @@ input:focus {
 .table-wrap {
   max-height: min(560px, calc(100vh - 250px));
   overflow: auto;
+}
+
+.inventory-table-wrap {
+  max-height: none;
+  min-height: 0;
+  flex: 1;
 }
 
 table {
@@ -576,6 +588,7 @@ tbody tr:last-child td {
 
 @media (max-width: 760px) {
   .workspace {
+    min-height: auto;
     padding: 16px;
   }
 
@@ -596,6 +609,11 @@ tbody tr:last-child td {
 
   .table-wrap {
     max-height: none;
+  }
+
+  .inventory-panel,
+  .inventory-table-wrap {
+    flex: initial;
   }
 }
 

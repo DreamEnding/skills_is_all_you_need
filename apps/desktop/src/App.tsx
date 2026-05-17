@@ -379,7 +379,7 @@ function UsageTable({ rows, t }: { rows: UsageSummaryInfo[]; t: Translate }) {
 
 function InventoryTable({ skills, t }: { skills: SkillInfo[]; t: Translate }) {
   return (
-    <div className="table-wrap">
+    <div className="table-wrap inventory-table-wrap">
       <table>
         <thead>
           <tr>
