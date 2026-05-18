@@ -19,6 +19,16 @@
         "fullscreen": false,
         "minWidth": 768,
         "minHeight": 540
+      },
+      {
+        "label": "panel",
+        "title": "Skill Manager",
+        "url": "/panel.html",
+        "width": 1100,
+        "height": 750,
+        "resizable": true,
+        "minWidth": 800,
+        "minHeight": 600
       }
     ],
     "security": {
