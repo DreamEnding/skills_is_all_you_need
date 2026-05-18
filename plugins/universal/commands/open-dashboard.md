@@ -1,3 +1,7 @@
+---
+description: Open or inspect the local Skill Usage Manager dashboard data.
+---
+
 # Open Skill Usage Dashboard
 
 Planned dashboard launcher:

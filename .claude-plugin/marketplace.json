@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
+  "name": "skills-is-all-you-need",
+  "version": "1.0.0",
+  "description": "Local Skill usage analytics for Claude Code and Codex.",
+  "owner": {
+    "name": "DreamEnding"
+  },
+  "plugins": [
+    {
+      "name": "skill-usage-manager",
+      "source": "./plugins/universal",
+      "description": "Track local Claude Code and Codex Skill usage in SQLite and view it in a desktop dashboard.",
+      "version": "1.0.0",
+      "author": {
+        "name": "DreamEnding"
+      },
+      "category": "productivity"
+    }
+  ]
+}

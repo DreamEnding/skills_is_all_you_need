@@ -1,0 +1,20 @@
+{
+  "name": "skills-is-all-you-need",
+  "interface": {
+    "displayName": "Skills Is All You Need"
+  },
+  "plugins": [
+    {
+      "name": "skill-usage-manager",
+      "source": {
+        "source": "local",
+        "path": "./plugins/universal"
+      },
+      "policy": {
+        "installation": "INSTALLED_BY_DEFAULT",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}
