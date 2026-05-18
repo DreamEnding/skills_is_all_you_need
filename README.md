@@ -1,5 +1,7 @@
 # Skill Usage Manager
 
+[English](README.md) | [中文](README_CN.md)
+
 Track which Skills your local agents actually use.
 
 Skill Usage Manager records Claude Code and Codex Skill invocations in a local SQLite database, then shows usage and inventory in a desktop dashboard. It is built for people who have many Skills installed and want to know which ones are active, stale, duplicated, or never used.
