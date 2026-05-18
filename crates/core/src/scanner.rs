@@ -1,5 +1,5 @@
 use crate::error::Result;
-use crate::models::{EnabledState, EnableStrategy, Platform, Skill, SkillLocation};
+use crate::models::{EnableStrategy, EnabledState, Platform, Skill, SkillLocation};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
@@ -136,11 +136,7 @@ fn scan_dir(dir: &Path, platform: Platform, out: &mut Vec<RawSkill>) -> Result<(
     Ok(())
 }
 
-fn parse_skill_md(
-    path: &Path,
-    platform: Platform,
-    skill_dir: &Path,
-) -> Result<Option<RawSkill>> {
+fn parse_skill_md(path: &Path, platform: Platform, skill_dir: &Path) -> Result<Option<RawSkill>> {
     let content = std::fs::read_to_string(path)?;
     let fm = parse_frontmatter(&content);
 
@@ -155,7 +151,10 @@ fn parse_skill_md(
         return Ok(None);
     }
 
-    let display_name = fm.get("display_name").cloned().unwrap_or_else(|| name.clone());
+    let display_name = fm
+        .get("display_name")
+        .cloned()
+        .unwrap_or_else(|| name.clone());
     let description = fm.get("description").cloned();
 
     Ok(Some(RawSkill {
@@ -218,6 +217,12 @@ mod tests {
         assert!(roots.contains(&home.join(".agents").join("skills")));
         assert!(roots.contains(&home.join(".codex").join("skills")));
         assert!(roots.contains(&home.join(".codex").join("plugins").join("cache")));
-        assert!(roots.contains(&home.join("work").join("project").join(".agents").join("skills")));
+        assert!(roots.contains(
+            &home
+                .join("work")
+                .join("project")
+                .join(".agents")
+                .join("skills")
+        ));
     }
 }

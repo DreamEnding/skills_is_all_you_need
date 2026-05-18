@@ -6,6 +6,7 @@
     "name": "Local"
   },
   "skills": "./skills/",
+  "hooks": "./hooks/codex-hooks.json",
   "interface": {
     "displayName": "Skill Usage Manager",
     "shortDescription": "Track and manage skill usage",
@@ -19,4 +20,3 @@
     "brandColor": "#2563EB"
   }
 }
-

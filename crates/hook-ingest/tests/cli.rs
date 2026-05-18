@@ -68,6 +68,76 @@ fn hook_import_and_summary_provide_cli_acceptance_path() {
 }
 
 #[test]
+fn hook_ingest_updates_summary_without_separate_import() {
+    let temp = tempfile::tempdir().expect("temp dir");
+    let raw = r#"{
+        "hook_event_name": "UserPromptExpansion",
+        "session_id": "session-2",
+        "command_name": "/research-lit",
+        "prompt": "/research-lit transformers"
+    }"#;
+
+    let mut ingest = Command::cargo_bin("skill-meter").expect("binary");
+    ingest
+        .env("SKILL_USAGE_MANAGER_HOME", temp.path())
+        .args(["hook", "ingest", "--platform", "claude"])
+        .write_stdin(raw)
+        .assert()
+        .success();
+
+    let mut summary = Command::cargo_bin("skill-meter").expect("binary");
+    let stdout = summary
+        .env("SKILL_USAGE_MANAGER_HOME", temp.path())
+        .args(["summary", "--format", "json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let rows: serde_json::Value = serde_json::from_slice(&stdout).expect("json");
+
+    assert_eq!(rows[0]["canonical_name"], "research-lit");
+    assert_eq!(rows[0]["platform"], "claude");
+    assert_eq!(rows[0]["confidence"], "confirmed");
+    assert_eq!(rows[0]["count"], 1);
+}
+
+#[test]
+fn repeated_hook_ingests_for_same_skill_are_counted_separately() {
+    let temp = tempfile::tempdir().expect("temp dir");
+    let raw = r#"{
+        "hook_event_name": "PreToolUse",
+        "session_id": "session-3",
+        "tool_name": "Skill",
+        "tool_input": { "skill_name": "test-driven-development" }
+    }"#;
+
+    for _ in 0..2 {
+        let mut ingest = Command::cargo_bin("skill-meter").expect("binary");
+        ingest
+            .env("SKILL_USAGE_MANAGER_HOME", temp.path())
+            .args(["hook", "ingest", "--platform", "claude"])
+            .write_stdin(raw)
+            .assert()
+            .success();
+    }
+
+    let mut summary = Command::cargo_bin("skill-meter").expect("binary");
+    let stdout = summary
+        .env("SKILL_USAGE_MANAGER_HOME", temp.path())
+        .args(["summary", "--format", "json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let rows: serde_json::Value = serde_json::from_slice(&stdout).expect("json");
+
+    assert_eq!(rows[0]["canonical_name"], "test-driven-development");
+    assert_eq!(rows[0]["count"], 2);
+}
+
+#[test]
 fn scan_supports_json_output_for_dev_preview() {
     let mut scan = Command::cargo_bin("skill-meter").expect("binary");
     let stdout = scan

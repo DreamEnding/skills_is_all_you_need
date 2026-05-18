@@ -132,7 +132,11 @@ fn doctor() -> skill_usage_core::error::Result<()> {
         events_dir.exists()
     );
     println!("queued event files: {queued_files}");
-    println!("database: {} [exists={}]", db_path.display(), db_path.exists());
+    println!(
+        "database: {} [exists={}]",
+        db_path.display(),
+        db_path.exists()
+    );
     println!("ingest errors: {error_count}");
     Ok(())
 }
@@ -202,9 +206,13 @@ fn ingest_hook(platform_str: &str, strict: bool) -> skill_usage_core::error::Res
         return Ok(());
     }
 
-    match events::parse_hook_event(platform, &stdin) {
-        Ok(Some(event)) => write_event(&event),
-        Ok(None) => Ok(()),
+    match events::parse_hook_events(platform, &stdin) {
+        Ok(events) => {
+            for event in events {
+                write_event(&event)?;
+            }
+            Ok(())
+        }
         Err(error) if strict => Err(error),
         Err(error) => {
             events::record_ingest_error(None, Some(platform), &stdin, &error.to_string())?;
@@ -266,5 +274,6 @@ fn write_event(event: &UsageEvent) -> skill_usage_core::error::Result<()> {
         .append(true)
         .open(&path)?;
     writeln!(file, "{line}")?;
+    events::record_usage_event(event)?;
     Ok(())
 }

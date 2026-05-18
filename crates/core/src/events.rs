@@ -4,6 +4,7 @@ use chrono::Utc;
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use std::collections::HashSet;
 use std::fs;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
@@ -25,9 +26,14 @@ struct HookEnvelope {
     tool_input: Option<serde_json::Value>,
     command_name: Option<String>,
     prompt: Option<String>,
+    transcript_path: Option<String>,
 }
 
 pub fn parse_hook_event(platform: Platform, raw: &str) -> Result<Option<UsageEvent>> {
+    Ok(parse_hook_events(platform, raw)?.into_iter().next())
+}
+
+pub fn parse_hook_events(platform: Platform, raw: &str) -> Result<Vec<UsageEvent>> {
     let env: HookEnvelope = serde_json::from_str(raw)?;
     let hook_type = env.hook_event_name.clone().unwrap_or_default();
     let session_hash = hash_str(env.session_id.as_deref().unwrap_or("unknown"));
@@ -36,6 +42,12 @@ pub fn parse_hook_event(platform: Platform, raw: &str) -> Result<Option<UsageEve
         Platform::Claude => parse_claude_hook(env, &hook_type, session_hash),
         Platform::Codex => parse_codex_hook(env, &hook_type, session_hash),
     }
+}
+
+pub fn record_usage_event(event: &UsageEvent) -> Result<bool> {
+    let conn = crate::db::open_db()?;
+    crate::db::run_migrations(&conn)?;
+    insert_usage_event(&conn, event)
 }
 
 pub fn import_queued_events(events_dir: &Path) -> Result<usize> {
@@ -135,20 +147,19 @@ fn parse_claude_hook(
     env: HookEnvelope,
     hook_type: &str,
     session_hash: String,
-) -> Result<Option<UsageEvent>> {
+) -> Result<Vec<UsageEvent>> {
     match hook_type {
         "PreToolUse" => {
             if env.tool_name.as_deref() != Some("Skill") && env.tool_name.is_some() {
-                return Ok(None);
+                return Ok(Vec::new());
             }
 
             let skill_name = env
                 .tool_input
                 .as_ref()
-                .and_then(|v| v.get("skill").or_else(|| v.get("name")))
-                .and_then(|v| v.as_str())
-                .unwrap_or("")
-                .to_string();
+                .and_then(|v| first_string_field(v, &["skill", "skill_name", "name"]))
+                .and_then(|skill| normalize_skill_name(&skill))
+                .unwrap_or_default();
 
             if skill_name.is_empty() {
                 return Err(AppError::InvalidPayload(
@@ -156,7 +167,7 @@ fn parse_claude_hook(
                 ));
             }
 
-            Ok(Some(UsageEvent {
+            Ok(vec![UsageEvent {
                 platform: Platform::Claude,
                 occurred_at: Utc::now(),
                 session_hash,
@@ -167,17 +178,26 @@ fn parse_claude_hook(
                 confidence: Confidence::Confirmed,
                 raw_skill_name: skill_name,
                 hook_version: Some(env!("CARGO_PKG_VERSION").into()),
-            }))
+            }])
         }
         "UserPromptExpansion" => {
-            let skill_name = env.command_name.unwrap_or_default();
+            let skill_name = env
+                .command_name
+                .as_deref()
+                .and_then(normalize_skill_name)
+                .or_else(|| {
+                    env.prompt
+                        .as_deref()
+                        .and_then(|prompt| extract_prefixed_skill_hint(prompt, '/'))
+                })
+                .unwrap_or_default();
             if skill_name.is_empty() {
                 return Err(AppError::InvalidPayload(
                     "UserPromptExpansion without command_name".into(),
                 ));
             }
 
-            Ok(Some(UsageEvent {
+            Ok(vec![UsageEvent {
                 platform: Platform::Claude,
                 occurred_at: Utc::now(),
                 session_hash,
@@ -188,7 +208,7 @@ fn parse_claude_hook(
                 confidence: Confidence::Confirmed,
                 raw_skill_name: skill_name,
                 hook_version: Some(env!("CARGO_PKG_VERSION").into()),
-            }))
+            }])
         }
         _ => Err(AppError::InvalidPayload(format!(
             "unsupported Claude hook type: {hook_type}"
@@ -200,15 +220,15 @@ fn parse_codex_hook(
     env: HookEnvelope,
     hook_type: &str,
     session_hash: String,
-) -> Result<Option<UsageEvent>> {
+) -> Result<Vec<UsageEvent>> {
     match hook_type {
         "UserPromptSubmit" => {
             let prompt = env.prompt.as_deref().unwrap_or("");
             let Some(skill_name) = extract_codex_skill_hint(prompt) else {
-                return Ok(None);
+                return Ok(Vec::new());
             };
 
-            Ok(Some(UsageEvent {
+            Ok(vec![UsageEvent {
                 platform: Platform::Codex,
                 occurred_at: Utc::now(),
                 session_hash,
@@ -219,9 +239,9 @@ fn parse_codex_hook(
                 confidence: Confidence::ExplicitHint,
                 raw_skill_name: skill_name,
                 hook_version: Some(env!("CARGO_PKG_VERSION").into()),
-            }))
+            }])
         }
-        "Stop" => Ok(None),
+        "Stop" => parse_codex_stop_transcript(env.transcript_path.as_deref(), session_hash),
         _ => Err(AppError::InvalidPayload(format!(
             "unsupported Codex hook type: {hook_type}"
         ))),
@@ -306,28 +326,138 @@ ON CONFLICT(date, skill_id, platform) DO UPDATE SET
 }
 
 fn extract_codex_skill_hint(prompt: &str) -> Option<String> {
-    prompt.split_whitespace().find_map(|word| {
-        let skill = word.strip_prefix('$')?;
-        let skill = skill.trim_matches(|c: char| {
-            !(c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == ':')
-        });
-        if skill.is_empty() {
-            None
-        } else {
-            Some(skill.to_string())
+    extract_prefixed_skill_hint(prompt, '$')
+}
+
+fn extract_prefixed_skill_hint(prompt: &str, prefix: char) -> Option<String> {
+    prompt
+        .split_whitespace()
+        .filter_map(|word| word.strip_prefix(prefix))
+        .find_map(normalize_skill_name)
+}
+
+fn first_string_field(value: &serde_json::Value, keys: &[&str]) -> Option<String> {
+    keys.iter()
+        .filter_map(|key| value.get(*key))
+        .find_map(|value| value.as_str().map(ToOwned::to_owned))
+}
+
+fn normalize_skill_name(raw: &str) -> Option<String> {
+    let skill = raw
+        .trim()
+        .trim_start_matches(['/', '$'])
+        .trim_matches(|c: char| !(c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == ':'));
+    if skill.is_empty() {
+        None
+    } else {
+        Some(skill.to_string())
+    }
+}
+
+fn parse_codex_stop_transcript(
+    transcript_path: Option<&str>,
+    session_hash: String,
+) -> Result<Vec<UsageEvent>> {
+    let Some(transcript_path) = transcript_path else {
+        return Ok(Vec::new());
+    };
+    let file = fs::File::open(transcript_path)?;
+    let reader = BufReader::new(file);
+    let mut events = Vec::new();
+    let mut seen_lines = HashSet::new();
+
+    for line in reader.lines() {
+        let line = line?;
+        let Ok(record) = serde_json::from_str::<serde_json::Value>(&line) else {
+            continue;
+        };
+        let Some(payload) = record.get("payload") else {
+            continue;
+        };
+        if payload.get("type").and_then(|v| v.as_str()) != Some("function_call") {
+            continue;
         }
-    })
+        let Some(name) = payload.get("name").and_then(|v| v.as_str()) else {
+            continue;
+        };
+        if !name.ends_with("shell_command") {
+            continue;
+        }
+
+        let Some(command_text) = transcript_command_text(payload) else {
+            continue;
+        };
+        let Some(skill_name) = extract_skill_name_from_skill_path(&command_text) else {
+            continue;
+        };
+        let occurred_at = record
+            .get("timestamp")
+            .and_then(|v| v.as_str())
+            .and_then(|timestamp| chrono::DateTime::parse_from_rfc3339(timestamp).ok())
+            .map(|timestamp| timestamp.with_timezone(&Utc))
+            .unwrap_or_else(Utc::now);
+        let line_key = format!("{}|{}|{}", occurred_at.to_rfc3339(), name, skill_name);
+        if !seen_lines.insert(line_key) {
+            continue;
+        }
+
+        events.push(UsageEvent {
+            platform: Platform::Codex,
+            occurred_at,
+            session_hash: session_hash.clone(),
+            turn_id: None,
+            cwd_hash: None,
+            invocation_kind: InvocationKind::Implicit,
+            detector: "codex-stop-transcript-skill-read".into(),
+            confidence: Confidence::Inferred,
+            raw_skill_name: skill_name,
+            hook_version: Some(env!("CARGO_PKG_VERSION").into()),
+        });
+    }
+
+    Ok(events)
+}
+
+fn transcript_command_text(payload: &serde_json::Value) -> Option<String> {
+    let arguments = payload.get("arguments")?;
+    if let Some(object) = arguments.as_object() {
+        return object
+            .get("command")
+            .and_then(|command| command.as_str())
+            .map(ToOwned::to_owned)
+            .or_else(|| Some(arguments.to_string()));
+    }
+    let arguments = arguments.as_str()?;
+    serde_json::from_str::<serde_json::Value>(arguments)
+        .ok()
+        .and_then(|value| {
+            value
+                .get("command")
+                .and_then(|command| command.as_str())
+                .map(ToOwned::to_owned)
+        })
+        .or_else(|| Some(arguments.to_string()))
+}
+
+fn extract_skill_name_from_skill_path(text: &str) -> Option<String> {
+    let normalized = text.replace('\\', "/");
+    let lower = normalized.to_ascii_lowercase();
+    let skill_file_index = lower.find("/skill.md")?;
+    let parent = normalized[..skill_file_index].trim_end_matches('/');
+    let skill_name = parent.rsplit('/').next()?;
+    normalize_skill_name(skill_name)
 }
 
 fn dedupe_key(event: &UsageEvent) -> String {
     let turn_or_session = event.turn_id.as_deref().unwrap_or(&event.session_hash);
     hash_str(&format!(
-        "{}|{}|{}|{}|{}",
+        "{}|{}|{}|{}|{}|{}",
         event.platform.as_str(),
         turn_or_session,
         event.raw_skill_name.trim(),
         invocation_kind_str(event.invocation_kind),
-        event.confidence.as_str()
+        event.confidence.as_str(),
+        event.occurred_at.to_rfc3339()
     ))
 }
 
@@ -408,6 +538,44 @@ mod tests {
         assert_eq!(event.platform, Platform::Codex);
         assert_eq!(event.raw_skill_name, "research-lit");
         assert_eq!(event.confidence, Confidence::ExplicitHint);
+    }
+
+    #[test]
+    fn parses_claude_skill_name_alias_and_normalizes_slash_command() {
+        let raw = r#"{
+            "hook_event_name": "PreToolUse",
+            "session_id": "session-3",
+            "tool_name": "Skill",
+            "tool_input": { "skill_name": "/auto-review-loop" }
+        }"#;
+
+        let event = parse_hook_event(Platform::Claude, raw)
+            .expect("parse")
+            .expect("event");
+
+        assert_eq!(event.raw_skill_name, "auto-review-loop");
+    }
+
+    #[test]
+    fn parses_codex_stop_transcript_skill_reads_as_inferred_events() {
+        let temp = tempfile::tempdir().expect("temp dir");
+        let transcript_path = temp.path().join("rollout.jsonl");
+        let transcript = r#"{"timestamp":"2026-05-17T10:00:00Z","type":"response_item","payload":{"type":"function_call","name":"shell_command","arguments":"{\"command\":\"Get-Content C:\\Users\\Chream\\.codex\\skills\\research-lit\\SKILL.md\",\"workdir\":\"D:\\repo\"}"}}"#;
+        std::fs::write(&transcript_path, transcript).expect("write transcript");
+        let raw = serde_json::json!({
+            "type": "Stop",
+            "session_id": "session-4",
+            "transcript_path": transcript_path,
+        })
+        .to_string();
+
+        let events = parse_hook_events(Platform::Codex, &raw).expect("parse");
+
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].platform, Platform::Codex);
+        assert_eq!(events[0].raw_skill_name, "research-lit");
+        assert_eq!(events[0].confidence, Confidence::Inferred);
+        assert_eq!(events[0].detector, "codex-stop-transcript-skill-read");
     }
 
     #[test]
