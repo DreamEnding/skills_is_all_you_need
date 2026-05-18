@@ -1,13 +1,10 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import App from "./App";
 import { ManagementPanel } from "./panel";
-
-const usePanel = typeof window !== "undefined"
-  && (window.location.hash === "#panel" || window.location.search.includes("panel=1"));
+import "./panel/panel.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    {usePanel ? <ManagementPanel /> : <App />}
+    <ManagementPanel />
   </React.StrictMode>,
 );

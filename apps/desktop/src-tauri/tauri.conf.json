@@ -14,11 +14,38 @@
       {
         "title": "Skill Usage Manager",
         "width": 1024,
-        "height": 768
+        "height": 768,
+        "resizable": true,
+        "fullscreen": false,
+        "minWidth": 768,
+        "minHeight": 540
+      },
+      {
+        "label": "panel",
+        "title": "Skill Manager",
+        "url": "/panel.html",
+        "width": 1100,
+        "height": 750,
+        "resizable": true,
+        "minWidth": 800,
+        "minHeight": 600
       }
     ],
     "security": {
       "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis", "msi"],
+    "icon": [
+      "icons/icon.ico",
+      "icons/icon.png"
+    ],
+    "windows": {
+      "nsis": {
+        "displayLanguageSelector": true
+      }
     }
   }
 }

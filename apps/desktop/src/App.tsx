@@ -5,8 +5,11 @@ import {
   getUsageSummary,
   importUsageEvents,
   scanSkills as scanSkillsCommand,
+  getSkillInventory,
+  setSkillEnabled,
   type SkillInfo,
   type UsageSummaryInfo,
+  type SkillInventoryRow,
 } from "./tauriClient";
 
 type Action = "scan" | "import" | "summary" | null;
@@ -29,6 +32,8 @@ function App() {
   const [view, setView] = useState<View>("overview");
   const [platformFilter, setPlatformFilter] = useState<PlatformFilter>("all");
   const [inventoryQuery, setInventoryQuery] = useState("");
+  const [inventoryRows, setInventoryRows] = useState<SkillInventoryRow[]>([]);
+  const [togglingId, setTogglingId] = useState<number | null>(null);
 
   const filteredSummary = useMemo(
     () =>
@@ -90,6 +95,21 @@ function App() {
       .sort((a, b) => a.canonical_name.localeCompare(b.canonical_name));
   }, [inventoryQuery, platformFilter, skills]);
 
+  const filteredInventoryRows = useMemo(() => {
+    const query = inventoryQuery.trim().toLowerCase();
+    return inventoryRows
+      .filter((row) => {
+        const platformMatch =
+          platformFilter === "all" || row.platform === platformFilter;
+        const queryMatch =
+          query.length === 0 ||
+          row.canonical_name.toLowerCase().includes(query) ||
+          row.skill_path.toLowerCase().includes(query);
+        return platformMatch && queryMatch;
+      })
+      .sort((a, b) => a.canonical_name.localeCompare(b.canonical_name) || a.platform.localeCompare(b.platform));
+  }, [inventoryQuery, platformFilter, inventoryRows]);
+
   const t = useMemo(() => {
     return (key: Parameters<typeof translate>[1], params?: Parameters<typeof translate>[2]) =>
       translate(language, key, params);
@@ -99,6 +119,12 @@ function App() {
   useEffect(() => {
     void refreshSummary();
   }, []);
+
+  useEffect(() => {
+    if (view === "inventory" && inventoryRows.length === 0) {
+      void loadInventory();
+    }
+  }, [view]);
 
   function selectLanguage(nextLanguage: Language) {
     setLanguage(nextLanguage);
@@ -137,6 +163,30 @@ function App() {
     const result = await runAction("scan", scanSkillsCommand);
     if (result) {
       setSkills(result);
+    }
+  }
+
+  async function loadInventory() {
+    const result = await runAction("scan", getSkillInventory);
+    if (result) {
+      setInventoryRows(result);
+    }
+  }
+
+  async function toggleSkill(locationId: number, currentState: string) {
+    const newState = currentState === "on" ? "off" : "on";
+    setTogglingId(locationId);
+    try {
+      await setSkillEnabled(locationId, newState);
+      setInventoryRows((prev) =>
+        prev.map((row) =>
+          row.location_id === locationId ? { ...row, enabled_state: newState } : row,
+        ),
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setTogglingId(null);
     }
   }
 
@@ -271,15 +321,24 @@ function App() {
         ) : (
           <section className="panel inventory-panel">
             <div className="inventory-toolbar">
-              <PanelHeading title={t("views.inventory")} meta={t("meta.visible", { count: filteredSkills.length })} />
+              <PanelHeading title={t("views.inventory")} meta={t("meta.visible", { count: filteredInventoryRows.length })} />
               <input
                 aria-label={t("aria.searchInventory")}
                 placeholder={t("search.placeholder")}
                 value={inventoryQuery}
                 onChange={(event) => setInventoryQuery(event.target.value)}
               />
+              <button onClick={() => void loadInventory()} disabled={activeAction !== null}>
+                {activeAction === "scan" ? <span className="spinner" /> : null}
+                {t("actions.scan")}
+              </button>
             </div>
-            <InventoryTable skills={filteredSkills} t={t} />
+            <InventoryTable
+              rows={filteredInventoryRows}
+              togglingId={togglingId}
+              onToggle={toggleSkill}
+              t={t}
+            />
           </section>
         )}
       </section>
@@ -377,30 +436,63 @@ function UsageTable({ rows, t }: { rows: UsageSummaryInfo[]; t: Translate }) {
   );
 }
 
-function InventoryTable({ skills, t }: { skills: SkillInfo[]; t: Translate }) {
+function InventoryTable({
+  rows,
+  togglingId,
+  onToggle,
+  t,
+}: {
+  rows: SkillInventoryRow[];
+  togglingId: number | null;
+  onToggle: (locationId: number, currentState: string) => void;
+  t: Translate;
+}) {
   return (
     <div className="table-wrap inventory-table-wrap">
       <table>
         <thead>
           <tr>
             <th>{t("tables.skill")}</th>
-            <th>{t("tables.platforms")}</th>
-            <th className="numeric">{t("tables.locations")}</th>
+            <th>{t("tables.platform")}</th>
+            <th>{t("tables.state")}</th>
+            <th className="toggle-col">{t("tables.enabled")}</th>
+            <th>{t("tables.locations")}</th>
           </tr>
         </thead>
         <tbody>
-          {skills.length === 0 ? (
+          {rows.length === 0 ? (
             <tr>
-              <td colSpan={3}>
+              <td colSpan={5}>
                 <EmptyState text={t("empty.inventory")} />
               </td>
             </tr>
           ) : (
-            skills.map((skill) => (
-              <tr key={skill.canonical_name}>
-                <td>{skill.canonical_name}</td>
-                <td>{uniquePlatforms(skill).join(", ")}</td>
-                <td className="numeric">{skill.locations.length}</td>
+            rows.map((row) => (
+              <tr key={row.location_id}>
+                <td>{row.canonical_name}</td>
+                <td>
+                  <span className={`badge platform-${row.platform}`}>{row.platform}</span>
+                </td>
+                <td>
+                  <span className={`badge state-${row.enabled_state}`}>{row.enabled_state}</span>
+                </td>
+                <td className="toggle-col">
+                  {row.supports_exact_disable ? (
+                    <button
+                      className={`toggle-switch ${row.enabled_state === "on" ? "active" : ""}`}
+                      disabled={togglingId === row.location_id}
+                      onClick={() => onToggle(row.location_id, row.enabled_state)}
+                      title={row.enabled_state === "on" ? "Disable" : "Enable"}
+                    >
+                      <span className="toggle-knob" />
+                    </button>
+                  ) : (
+                    <span className="muted">—</span>
+                  )}
+                </td>
+                <td className="path-col" title={row.skill_path}>
+                  {row.skill_path}
+                </td>
               </tr>
             ))
           )}

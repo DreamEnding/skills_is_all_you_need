@@ -11,7 +11,9 @@ Skill Usage Manager records Claude Code and Codex Skill invocations in a local S
 - Counts Claude Code Skill calls in the background.
 - Counts Codex Skill usage signals in the background.
 - Scans local Claude Code and Codex Skill folders.
+- Enables or disables Skills directly from the dashboard.
 - Shows a bilingual dashboard for usage summary and Skill inventory.
+- Provides a cc-switch-style management panel GUI with glass-morphism design.
 - Keeps data local by default.
 - Works without keeping the dashboard open.
 
@@ -76,6 +78,25 @@ cd skills_is_all_you_need
 pnpm --dir apps/desktop install
 pnpm --dir apps/desktop dev
 ```
+
+Build a desktop installer (Windows):
+
+```bash
+cargo tauri build
+```
+
+This produces an NSIS setup exe and an MSI installer under `target/release/bundle/`.
+
+## Management Panel
+
+The app includes a second window — the **Skill Manager** panel — inspired by [cc-switch](https://github.com/farion1231/cc-switch). It provides:
+
+- **Overview** — metric cards, animated top-skill bar charts, platform share breakdown.
+- **Skills** — grouped skill cards with one-click toggle switches to enable/disable, expandable multi-location details.
+- **Diagnostics** — hook health checks, skill state summary bars, platform breakdown table.
+- **Settings** — general, data storage, and about sections.
+
+Features glass-morphism card design, Framer Motion spring animations, dark/light theme toggle, and EN/ZH language support.
 
 ## What Gets Counted
 
@@ -175,6 +196,8 @@ pnpm --dir apps/desktop build
 - SQLite via `rusqlite`
 - Tauri 2 desktop shell
 - React + TypeScript + Vite dashboard
+- Framer Motion animations
+- Tailwind CSS v4
 - Claude Code and Codex plugin hooks
 
 ## Status
@@ -187,11 +210,15 @@ Implemented:
 - local usage database
 - Claude and Codex usage signals
 - Skill inventory scan
-- bilingual dashboard
+- bilingual dashboard (EN/ZH)
 - public plugin marketplace metadata
+- enable/disable Skill management from the dashboard
+- cc-switch-style management panel GUI
+- Windows desktop installers (NSIS + MSI)
+- dark/light theme support
+- audit log for config changes
 
 Still planned:
 
-- enable/disable Skill management from the dashboard
-- packaged desktop installers
 - deeper Codex confirmed-use detection if a stable Skill hook becomes available
+- macOS and Linux installer support

@@ -27,12 +27,17 @@ type TranslationKey =
   | "status.scanning"
   | "status.status"
   | "status.waitingImport"
+  | "status.toggling"
+  | "status.toggleSuccess"
+  | "status.toggleError"
   | "tables.calls"
   | "tables.confidence"
   | "tables.locations"
   | "tables.platform"
   | "tables.platforms"
   | "tables.skill"
+  | "tables.enabled"
+  | "tables.state"
   | "views.inventory"
   | "views.overview"
   | "empty.inventory"
@@ -79,12 +84,17 @@ const translations: Record<Language, Record<TranslationKey, string>> = {
     "status.scanning": "Scanning",
     "status.status": "Status",
     "status.waitingImport": "Waiting for import",
+    "status.toggling": "Toggling",
+    "status.toggleSuccess": "Skill state updated",
+    "status.toggleError": "Toggle failed",
     "tables.calls": "Calls",
     "tables.confidence": "Confidence",
     "tables.locations": "Locations",
     "tables.platform": "Platform",
     "tables.platforms": "Platforms",
     "tables.skill": "Skill",
+    "tables.enabled": "Enabled",
+    "tables.state": "State",
     "views.inventory": "Skill inventory",
     "views.overview": "Usage overview",
     "empty.inventory": "Run a scan or adjust the filter to see local Skills.",
@@ -128,12 +138,17 @@ const translations: Record<Language, Record<TranslationKey, string>> = {
     "status.scanning": "正在扫描",
     "status.status": "状态",
     "status.waitingImport": "等待导入",
+    "status.toggling": "切换中",
+    "status.toggleSuccess": "技能状态已更新",
+    "status.toggleError": "切换失败",
     "tables.calls": "调用",
     "tables.confidence": "可信度",
     "tables.locations": "位置数",
     "tables.platform": "平台",
     "tables.platforms": "平台",
     "tables.skill": "技能",
+    "tables.enabled": "启用",
+    "tables.state": "状态",
     "views.inventory": "技能清单",
     "views.overview": "用量概览",
     "empty.inventory": "运行扫描或调整筛选条件以查看本地技能。",

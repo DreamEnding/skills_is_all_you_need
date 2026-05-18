@@ -11,7 +11,9 @@ Skill Usage Manager 会把 Claude Code 和 Codex 的 Skill 调用记录到本地
 - 后台统计 Claude Code 的 Skill 调用。
 - 后台统计 Codex 的 Skill 使用信号。
 - 扫描本机 Claude Code 和 Codex 的 Skill 目录。
+- 在看板中直接启用/禁用 Skill。
 - 提供中英双语桌面看板，展示使用概览和 Skill 清单。
+- 提供 cc-switch 风格的管理面板 GUI，支持毛玻璃效果和流畅动画。
 - 默认所有数据只保存在本地。
 - 不需要一直打开桌面看板，hook 也会继续计数。
 
@@ -76,6 +78,25 @@ cd skills_is_all_you_need
 pnpm --dir apps/desktop install
 pnpm --dir apps/desktop dev
 ```
+
+构建 Windows 桌面安装器：
+
+```bash
+cargo tauri build
+```
+
+会在 `target/release/bundle/` 下生成 NSIS 安装包和 MSI 安装包。
+
+## 管理面板
+
+应用包含第二个窗口——**Skill Manager** 管理面板，设计参考了 [cc-switch](https://github.com/farion1231/cc-switch)。提供以下功能：
+
+- **概览** — 指标卡片、动态柱状图、平台占比。
+- **技能** — 分组卡片式 Skill 列表，一键切换开关，支持展开多位置详情。
+- **诊断** — 钩子健康检查、启用/禁用状态摘要、平台分布表格。
+- **设置** — 通用、数据存储和关于页面。
+
+采用毛玻璃卡片设计、Framer Motion 弹簧动画、深色/浅色主题切换、中英双语支持。
 
 ## 会统计哪些调用
 
@@ -175,6 +196,8 @@ pnpm --dir apps/desktop build
 - SQLite，使用 `rusqlite`
 - Tauri 2 桌面外壳
 - React + TypeScript + Vite 看板
+- Framer Motion 动画
+- Tailwind CSS v4
 - Claude Code 和 Codex plugin hooks
 
 ## 状态
@@ -189,9 +212,13 @@ pnpm --dir apps/desktop build
 - Skill 清单扫描
 - 中英双语看板
 - public plugin marketplace 元数据
+- 在看板里启用/禁用 Skill
+- cc-switch 风格管理面板 GUI
+- Windows 桌面安装器（NSIS + MSI）
+- 深色/浅色主题
+- 配置变更审计日志
 
 计划中：
 
-- 在看板里启用/禁用 Skill
-- 打包桌面安装器
 - 如果 Codex 之后提供稳定 Skill hook，补更可靠的 confirmed 统计
+- macOS 和 Linux 安装器支持

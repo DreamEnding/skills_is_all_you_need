@@ -12,6 +12,23 @@ export interface UsageSummaryInfo {
   count: number;
 }
 
+export interface SkillInventoryRow {
+  location_id: number;
+  canonical_name: string;
+  platform: string;
+  scope: string;
+  skill_path: string;
+  enabled_state: string;
+  enable_strategy: string;
+  supports_exact_disable: boolean;
+}
+
+export interface ToggleResultInfo {
+  location_id: number;
+  new_state: string;
+  backup_path: string | null;
+}
+
 const previewSummary: UsageSummaryInfo[] = [
   {
     canonical_name: "brainstorming",
@@ -57,6 +74,49 @@ const previewSkills: SkillInfo[] = [
   },
 ];
 
+const previewInventory: SkillInventoryRow[] = [
+  {
+    location_id: 1,
+    canonical_name: "brainstorming",
+    platform: "claude",
+    scope: "user",
+    skill_path: "~/.claude/skills/brainstorming/SKILL.md",
+    enabled_state: "on",
+    enable_strategy: "skill-override",
+    supports_exact_disable: true,
+  },
+  {
+    location_id: 2,
+    canonical_name: "smart-search",
+    platform: "codex",
+    scope: "user",
+    skill_path: "~/.agents/skills/smart-search/SKILL.md",
+    enabled_state: "on",
+    enable_strategy: "codex-config",
+    supports_exact_disable: true,
+  },
+  {
+    location_id: 3,
+    canonical_name: "test-driven-development",
+    platform: "claude",
+    scope: "user",
+    skill_path: "~/.claude/skills/test-driven-development/SKILL.md",
+    enabled_state: "on",
+    enable_strategy: "skill-override",
+    supports_exact_disable: true,
+  },
+  {
+    location_id: 4,
+    canonical_name: "test-driven-development",
+    platform: "codex",
+    scope: "user",
+    skill_path: "~/.agents/skills/test-driven-development/SKILL.md",
+    enabled_state: "off",
+    enable_strategy: "codex-config",
+    supports_exact_disable: true,
+  },
+];
+
 export function isTauriRuntime(): boolean {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 }
@@ -80,6 +140,35 @@ export async function scanSkills(): Promise<SkillInfo[]> {
     return scanSkillsFromDevServer();
   }
   return invoke<SkillInfo[]>("scan_skills");
+}
+
+export async function getSkillInventory(): Promise<SkillInventoryRow[]> {
+  if (!isTauriRuntime()) {
+    return previewInventory;
+  }
+  return invoke<SkillInventoryRow[]>("get_skill_inventory");
+}
+
+export async function setSkillEnabled(
+  locationId: number,
+  newState: string,
+): Promise<ToggleResultInfo> {
+  return invoke<ToggleResultInfo>("set_skill_enabled", {
+    locationId,
+    newState,
+    dryRun: false,
+  });
+}
+
+export async function bulkSetSkillEnabled(
+  locationIds: number[],
+  newState: string,
+): Promise<ToggleResultInfo[]> {
+  return invoke<ToggleResultInfo[]>("bulk_set_skill_enabled", {
+    locationIds,
+    newState,
+    dryRun: false,
+  });
 }
 
 async function scanSkillsFromDevServer(): Promise<SkillInfo[]> {

@@ -1,5 +1,6 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import tailwindcss from "@tailwindcss/vite";
 import { execFile } from "node:child_process";
 import path from "node:path";
 
@@ -32,8 +33,13 @@ function skillMeterDevApi() {
 }
 
 export default defineConfig({
-  plugins: [react(), skillMeterDevApi()],
+  plugins: [react(), tailwindcss(), skillMeterDevApi()],
   clearScreen: false,
+  resolve: {
+    alias: {
+      "@": path.resolve(__dirname, "src"),
+    },
+  },
   server: {
     port: 1420,
     strictPort: true,
