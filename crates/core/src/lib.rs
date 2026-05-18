@@ -1,3 +1,4 @@
+pub mod config_editor;
 pub mod db;
 pub mod error;
 pub mod events;

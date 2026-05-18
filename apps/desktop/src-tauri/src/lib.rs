@@ -20,6 +20,13 @@ struct UsageSummaryInfo {
     count: i64,
 }
 
+#[derive(Serialize)]
+struct ToggleResultInfo {
+    location_id: i64,
+    new_state: String,
+    backup_path: Option<String>,
+}
+
 #[tauri::command]
 fn scan_skills() -> Result<Vec<SkillInfo>, String> {
     let results = skill_usage_core::scanner::scan_all().map_err(|e| e.to_string())?;
@@ -59,13 +66,76 @@ fn get_usage_summary() -> Result<Vec<UsageSummaryInfo>, String> {
         .collect())
 }
 
+#[tauri::command]
+fn get_skill_inventory() -> Result<Vec<skill_usage_core::config_editor::SkillInventoryRow>, String> {
+    skill_usage_core::config_editor::get_skill_inventory().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn set_skill_enabled(
+    location_id: i64,
+    new_state: String,
+    dry_run: bool,
+) -> Result<ToggleResultInfo, String> {
+    let state = parse_enabled_state(&new_state)?;
+    let result =
+        skill_usage_core::config_editor::set_skill_enabled(location_id, state, dry_run)
+            .map_err(|e| e.to_string())?;
+    Ok(ToggleResultInfo {
+        location_id: result.location_id,
+        new_state: result.new_state.as_str().to_string(),
+        backup_path: result.backup_path,
+    })
+}
+
+#[tauri::command]
+fn bulk_set_skill_enabled(
+    location_ids: Vec<i64>,
+    new_state: String,
+    dry_run: bool,
+) -> Result<Vec<ToggleResultInfo>, String> {
+    let state = parse_enabled_state(&new_state)?;
+    let results =
+        skill_usage_core::config_editor::bulk_set_skill_enabled(&location_ids, state, dry_run)
+            .map_err(|e| e.to_string())?;
+    Ok(results
+        .into_iter()
+        .map(|r| ToggleResultInfo {
+            location_id: r.location_id,
+            new_state: r.new_state.as_str().to_string(),
+            backup_path: r.backup_path,
+        })
+        .collect())
+}
+
+#[tauri::command]
+fn get_audit_log(limit: Option<i64>) -> Result<Vec<skill_usage_core::config_editor::AuditEntry>, String> {
+    skill_usage_core::config_editor::recent_audit_log(limit.unwrap_or(50))
+        .map_err(|e| e.to_string())
+}
+
+fn parse_enabled_state(s: &str) -> Result<skill_usage_core::models::EnabledState, String> {
+    use skill_usage_core::models::EnabledState;
+    match s {
+        "on" => Ok(EnabledState::On),
+        "name-only" => Ok(EnabledState::NameOnly),
+        "user-invocable-only" => Ok(EnabledState::UserInvocableOnly),
+        "off" => Ok(EnabledState::Off),
+        _ => Err(format!("invalid enabled state: {s}")),
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
             scan_skills,
             import_usage_events,
-            get_usage_summary
+            get_usage_summary,
+            get_skill_inventory,
+            set_skill_enabled,
+            bulk_set_skill_enabled,
+            get_audit_log
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
