@@ -5,4 +5,3 @@ usage.db
 *.db-wal
 *.db-shm
 *.jsonl
-*.log

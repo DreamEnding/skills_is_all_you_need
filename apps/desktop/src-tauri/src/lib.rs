@@ -85,7 +85,7 @@ mod tests {
         let mut file = std::fs::File::create(events_dir.join("20260517.jsonl")).expect("file");
         writeln!(
             file,
-            r#"{{"platform":"claude","occurred_at":"2026-05-17T10:00:00Z","session_hash":"session-hash","turn_id":"turn-1","cwd_hash":"cwd-hash","invocation_kind":"model-tool-call","detector":"test","confidence":"confirmed","raw_skill_name":"brainstorming","hook_version":"0.1.0"}}"#
+            r#"{{"platform":"claude","occurred_at":"2026-05-17T10:00:00Z","session_hash":"session-hash","turn_id":"turn-1","cwd_hash":"cwd-hash","invocation_kind":"model-tool-call","detector":"test","confidence":"confirmed","raw_skill_name":"brainstorming","hook_version":"1.0.0"}}"#
         )
         .expect("write event");
 

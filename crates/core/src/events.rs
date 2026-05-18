@@ -595,7 +595,7 @@ mod tests {
                 detector: "test".into(),
                 confidence: Confidence::Confirmed,
                 raw_skill_name: "brainstorming".into(),
-                hook_version: Some("0.1.0".into()),
+                hook_version: Some("1.0.0".into()),
             };
             let line = serde_json::to_string(&event).unwrap();
             let path = events_dir.join("20260517.jsonl");
